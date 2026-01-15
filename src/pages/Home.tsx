@@ -13,7 +13,7 @@ import {
   User
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import mapImage from "@/assets/map-interface.jpg";
+import Map from "@/components/Map";
 
 const Home = () => {
   const [pickup, setPickup] = useState("");
@@ -55,21 +55,8 @@ const Home = () => {
         {/* Map Section */}
         <Card className="card-taxi overflow-hidden animate-fade-in">
           <div className="relative h-48">
-            <img 
-              src={mapImage} 
-              alt="Live Map" 
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-            <div className="absolute top-4 right-4">
-              <Button 
-                size="icon" 
-                className="bg-card/90 text-foreground hover:bg-card rounded-xl shadow-lg"
-              >
-                <Navigation className="w-5 h-5" />
-              </Button>
-            </div>
-            <div className="absolute bottom-4 left-4 flex items-center space-x-2 bg-card/90 backdrop-blur-sm rounded-xl px-3 py-2">
+            <Map />
+            <div className="absolute bottom-4 left-4 flex items-center space-x-2 bg-card/90 backdrop-blur-sm rounded-xl px-3 py-2 pointer-events-none">
               <MapPin className="w-4 h-4 text-primary" />
               <span className="text-sm font-medium">Current Location</span>
             </div>
