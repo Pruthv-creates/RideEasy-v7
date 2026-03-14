@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { Navigation } from 'lucide-react';
 
 interface DriverLocation {
   id: string;
@@ -207,12 +208,6 @@ const MapLibreMap: React.FC<MapProps> = ({
     }
   }, [pickup, destination]);
 
-import { Navigation } from 'lucide-react';
-import 'maplibre-gl/dist/maplibre-gl.css';
-
-// ... (rest of the interface stays same)
-
-// (At the bottom of the return)
   return (
     <div className="relative w-full h-full overflow-hidden">
         <div ref={mapContainer} style={{ width: '100%', height }} />

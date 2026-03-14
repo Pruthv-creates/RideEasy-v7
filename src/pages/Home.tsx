@@ -56,19 +56,25 @@ const Home = () => {
   useEffect(() => {
     let mounted = true;
     if (!pickup) {
+        toast.info("Detecting your location...", { id: "loc-load" });
         getReliableLocation().then(async (loc) => {
             if (!mounted) return;
             setPickupCoords({ lat: loc.lat, lng: loc.lng });
+            
+            if (loc.source === 'gps') {
+                toast.success("Location found via GPS", { id: "loc-load" });
+            } else if (loc.source === 'ip') {
+                toast.info("Showing nearest city (IP based)", { id: "loc-load" });
+            }
+
             // Reverse geocode
             try {
                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${loc.lat}&lon=${loc.lng}`, {
                    headers: {
                        'Accept-Language': 'en-US,en;q=0.9',
-                       // Nominatim requires User-Agent for free tier
-                       'User-Agent': 'RideEasy/1.0 (Contact: local@dev.com)'
+                       'User-Agent': 'RideEasy/1.0'
                    }
                });
-               if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                const data = await res.json();
                if (data.display_name && mounted) {
                    setPickup(data.display_name.split(',').slice(0, 3).join(','));
@@ -77,6 +83,8 @@ const Home = () => {
                 console.error("Geocoding failed, using coordinates:", e);
                 if (mounted) setPickup("Current Location");
             }
+        }).catch(() => {
+            if (mounted) toast.error("Could not detect location. Using default center.", { id: "loc-load" });
         });
     }
     return () => { mounted = false; };
@@ -283,6 +291,25 @@ const Home = () => {
             drivers={nearbyDrivers}
             pickup={pickupCoords ? [pickupCoords.lng, pickupCoords.lat] : undefined}
             destination={destinationCoords ? [destinationCoords.lng, destinationCoords.lat] : undefined}
+            onLocateMe={async () => {
+                try {
+                    toast.info("Finding your location...");
+                    const loc = await getReliableLocation();
+                    setPickupCoords({ lat: loc.lat, lng: loc.lng });
+                    
+                    // Reverse geocode
+                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${loc.lat}&lon=${loc.lng}`, {
+                        headers: { 'Accept-Language': 'en-US', 'User-Agent': 'RideEasy/1.0' }
+                    });
+                    const data = await res.json();
+                    if (data.display_name) {
+                        setPickup(data.display_name.split(',').slice(0, 3).join(','));
+                        toast.success("Location updated!");
+                    }
+                } catch (e) {
+                    toast.error("Could not get location. Please enable GPS.");
+                }
+            }}
             onMapClick={(lng, lat) => {
               if (activeInput === "pickup") {
                 setPickupCoords({ lat, lng });
