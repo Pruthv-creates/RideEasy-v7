@@ -3,6 +3,8 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Navigation } from 'lucide-react';
 
+import taxiPng from '@/assets/taxi map image.png';
+
 interface DriverLocation {
   id: string;
   lat: number;
@@ -39,6 +41,14 @@ const MapLibreMap: React.FC<MapProps> = ({
   const map = useRef<maplibregl.Map | null>(null);
   const markers = useRef<maplibregl.Marker[]>([]);
   const driverMarkers = useRef<Map<string, maplibregl.Marker>>(new Map());
+  const driverHeadings = useRef<Map<string, number>>(new Map());
+
+  // Calculate heading between two points
+  const getHeading = (p1: [number, number], p2: [number, number]) => {
+    const dLng = p2[0] - p1[0];
+    const dLat = p2[1] - p1[1];
+    return (Math.atan2(dLng, dLat) * 180) / Math.PI;
+  };
 
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
@@ -48,16 +58,15 @@ const MapLibreMap: React.FC<MapProps> = ({
       style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
       center: center,
       zoom: zoom,
+      attributionControl: false
     });
+
+    map.current.addControl(new maplibregl.AttributionControl(), 'bottom-left');
 
     map.current.on('load', () => {
+      console.log("Map loaded successfully");
       map.current?.resize();
     });
-
-    // Fallback resize
-    setTimeout(() => {
-        map.current?.resize();
-    }, 500);
 
     map.current.on('click', (e) => {
       if (onMapClick) onMapClick(e.lngLat.lng, e.lngLat.lat);
@@ -69,15 +78,18 @@ const MapLibreMap: React.FC<MapProps> = ({
     };
   }, []);
 
-  // Update center
+  // Update center smoothly
   useEffect(() => {
     if (map.current) {
-      map.current.setCenter(center);
-      map.current.resize();
+        map.current.easeTo({
+            center: center,
+            duration: 1500,
+            essential: true
+        });
     }
   }, [center]);
 
-  // Update drivers
+  // Update drivers with rotation
   useEffect(() => {
     if (!map.current) return;
 
@@ -87,29 +99,43 @@ const MapLibreMap: React.FC<MapProps> = ({
       if (!currentIds.has(id)) {
         marker.remove();
         driverMarkers.current.delete(id);
+        driverHeadings.current.delete(id);
       }
     });
 
     // Add or update drivers
     drivers.forEach(driver => {
       const existing = driverMarkers.current.get(driver.id);
+      const newPos: [number, number] = [driver.lng, driver.lat];
+      
       if (existing) {
-        existing.setLngLat([driver.lng, driver.lat]);
+        const oldPos = existing.getLngLat();
+        const heading = getHeading([oldPos.lng, oldPos.lat], newPos);
+        
+        // Update rotation if there's movement
+        if (Math.abs(oldPos.lng - driver.lng) > 0.00001 || Math.abs(oldPos.lat - driver.lat) > 0.00001) {
+            const el = existing.getElement();
+            const icon = el.querySelector('.car-icon') as HTMLElement;
+            if (icon) {
+                icon.style.transform = `rotate(${heading}deg)`;
+            }
+            driverHeadings.current.set(driver.id, heading);
+        }
+        
+        existing.setLngLat(newPos);
       } else {
         const el = document.createElement('div');
         el.className = 'driver-marker';
-        // Premium Nav Arrow Marker (Matches Screenshot)
+        // Taxi Icon from assets
         el.innerHTML = `
-            <div class="flex items-center justify-center w-10 h-10 bg-white rounded-full border-4 border-black shadow-2xl ring-4 ring-white/20 transition-all duration-300">
-                <svg viewBox="0 0 24 24" class="w-5 h-5 fill-black transform -rotate-45">
-                    <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
-                </svg>
+            <div class="relative w-12 h-12 flex items-center justify-center drop-shadow-2xl group">
+                <img src="${taxiPng}" class="car-icon w-10 h-10 object-contain transition-all duration-700 ease-in-out" />
             </div>
         `;
-        el.style.transition = 'all 0.5s ease-out';
+        el.style.transition = 'all 1.0s linear'; // Smooth linear interpolation for movement
 
         const marker = new maplibregl.Marker({ element: el })
-          .setLngLat([driver.lng, driver.lat])
+          .setLngLat(newPos)
           .addTo(map.current!);
         driverMarkers.current.set(driver.id, marker);
       }
@@ -127,51 +153,117 @@ const MapLibreMap: React.FC<MapProps> = ({
         return;
       }
 
-      // 1. FULL ROUTE (SHADOW)
-      if (fullRoute) {
+      // 1. FULL ROUTE (THE TOTAL PATH)
+      if (fullRoute && fullRoute.length > 0) {
+        console.log("FULL ROUTE:", fullRoute);
         const sourceId = 'full-route-source';
         const layerId = 'full-route-layer';
         const geojson: any = { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: fullRoute }};
         
         const source = map.current.getSource(sourceId);
-        if (source && 'setData' in source) {
+        if (source) {
             (source as any).setData(geojson);
         } else {
-            map.current.addSource(sourceId, { type: 'geojson', data: geojson });
+            map.current.addSource(sourceId, { type: 'geojson', data: geojson, lineMetrics: true });
             map.current.addLayer({
                 id: layerId,
                 type: 'line',
                 source: sourceId,
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: { 'line-color': '#cbd5e1', 'line-width': 10, 'line-opacity': 0.4 }
+                paint: { 'line-color': '#1e293b', 'line-width': 6, 'line-opacity': 0.15, 'line-dasharray': [2, 2] }
             });
+        }
+        if (map.current.getLayer(layerId)) {
+            map.current.moveLayer(layerId);
         }
       }
 
-      // 2. ACTIVE ROUTE (BLACK)
-      if (route) {
+      // 2. ACTIVE ROUTE (THE REMAINING PATH)
+      if (route && route.length > 0) {
+        console.log("ACTIVE ROUTE:", route);
         const sourceId = 'active-route-source';
         const layerId = 'active-route-layer';
+        const casingId = 'active-route-casing';
         const geojson: any = { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: route }};
 
         const source = map.current.getSource(sourceId);
-        if (source && 'setData' in source) {
+        if (source) {
             (source as any).setData(geojson);
         } else {
-            map.current.addSource(sourceId, { type: 'geojson', data: geojson });
+            map.current.addSource(sourceId, { type: 'geojson', data: geojson, lineMetrics: true });
+            
+            // Casing
+            map.current.addLayer({
+                id: casingId,
+                type: 'line',
+                source: sourceId,
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: { 'line-color': '#ffffff', 'line-width': 10, 'line-opacity': 1 }
+            });
+
+            // Main Gradient Route
             map.current.addLayer({
                 id: layerId,
                 type: 'line',
                 source: sourceId,
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: { 'line-color': '#000000', 'line-width': 8, 'line-opacity': 1.0 }
+                paint: { 
+                    'line-width': 6, 
+                    'line-opacity': 1,
+                    'line-gradient': [
+                        'interpolate',
+                        ['linear'],
+                        ['line-progress'],
+                        0, '#000000',  // Sharp start
+                        1, '#475569'   // Faded end
+                    ]
+                }
             });
+        }
+        
+        if (map.current.getLayer(casingId)) {
+            map.current.moveLayer(casingId);
+        }
+        if (map.current.getLayer(layerId)) {
+            map.current.moveLayer(layerId);
         }
       }
     };
 
     drawRoute();
   }, [route, fullRoute]);
+
+  const lastBoundsRef = useRef<string>("");
+
+  // Fit Bounds logic
+  useEffect(() => {
+    if (!map.current) return;
+
+    const isValidCoord = (coord: any): coord is [number, number] => 
+      Array.isArray(coord) && 
+      coord.length === 2 && 
+      typeof coord[0] === 'number' && !isNaN(coord[0]) &&
+      typeof coord[1] === 'number' && !isNaN(coord[1]);
+
+    if (isValidCoord(pickup) && isValidCoord(destination)) {
+        const boundsKey = `${pickup.join(',')}|${destination.join(',')}`;
+        if (lastBoundsRef.current === boundsKey) return;
+        lastBoundsRef.current = boundsKey;
+
+        try {
+            const bounds = new maplibregl.LngLatBounds();
+            bounds.extend(pickup);
+            bounds.extend(destination);
+            
+            map.current.fitBounds(bounds, {
+                padding: 80,
+                duration: 2000
+            });
+        } catch (err) {
+            console.error("MapLibre fitBounds error:", err);
+        }
+    }
+  }, [pickup, destination]);
 
   // Pickup and Destination Markers
   useEffect(() => {
@@ -209,8 +301,8 @@ const MapLibreMap: React.FC<MapProps> = ({
   }, [pickup, destination]);
 
   return (
-    <div className="relative w-full h-full overflow-hidden">
-        <div ref={mapContainer} style={{ width: '100%', height }} />
+    <div className="relative w-full overflow-hidden" style={{ height }}>
+        <div ref={mapContainer} className="w-full h-full" />
         
         {onLocateMe && (
             <button 

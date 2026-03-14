@@ -23,6 +23,7 @@ import {
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { ChatInterface } from "@/components/ChatInterface";
 
 import MapLibreMap from "@/components/MapLibreMap";
 
@@ -38,6 +39,12 @@ interface Ride {
   dropoff_lat: number;
   dropoff_lng: number;
   payment_status: string;
+  otp_code: string;
+}
+
+interface DriverInfo {
+    full_name: string;
+    vehicle_number: string;
 }
 
 const RideDetails = () => {
@@ -48,6 +55,8 @@ const RideDetails = () => {
   const [driverLoc, setDriverLoc] = useState<{lat: number, lng: number} | null>(null);
   const [liveStats, setLiveStats] = useState({ distance: 0, duration: 0 });
   const [hasRated, setHasRated] = useState(false);
+  const [driverInfo, setDriverInfo] = useState<DriverInfo | null>(null);
+  const [showChat, setShowChat] = useState(false);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const rideId = searchParams.get("id");
@@ -202,12 +211,22 @@ const RideDetails = () => {
 
       if (error) throw error;
       setRide(data);
+      if (data.driver_id) {
+          fetchDriverInfo(data.driver_id);
+      }
     } catch (err) {
       console.error(err);
       toast.error("Failed to load ride details");
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchDriverInfo = async (driverId: string) => {
+      const { data } = await supabase.from('profiles').select('full_name, vehicle_number').eq('id', driverId).single();
+      if (data) {
+          setDriverInfo(data as DriverInfo);
+      }
   };
 
   const statusMessages: Record<string, string> = {
@@ -327,6 +346,30 @@ const RideDetails = () => {
           </Card>
         )}
 
+        {/* OTP Security Code */}
+        {ride.status === "accepted" || ride.status === "arrived" ? (
+            <Card className="p-6 bg-slate-900 border-none shadow-2xl relative overflow-hidden group rounded-[32px]">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+                <div className="relative z-10 flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center border border-white/10">
+                            <Shield className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary mb-0.5">Security Code</p>
+                            <h4 className="text-xs font-bold text-white opacity-80 leading-tight">Show to driver</h4>
+                        </div>
+                    </div>
+                    
+                    <div className="bg-primary px-5 py-2.5 rounded-2xl shadow-xl flex items-center justify-center min-w-[100px]">
+                        <span className="text-2xl font-black text-black tracking-normal">
+                            {ride.otp_code || "----"}
+                        </span>
+                    </div>
+                </div>
+            </Card>
+        ) : null}
+
         {/* Driver Details (If Accepted) */}
         {ride.status !== "requested" && ride.status !== "cancelled" && (
           <Card className="card-taxi p-5 overflow-hidden animate-scale-in border-l-4 border-l-primary shadow-lg">
@@ -345,28 +388,32 @@ const RideDetails = () => {
 
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
-                  <h3 className="font-bold text-lg leading-none">Ashok Kumar</h3>
+                  <h3 className="font-bold text-lg leading-none">{driverInfo?.full_name || 'Accepted Driver'}</h3>
                   <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 font-bold">
                     <Star className="w-3 h-3 mr-1 fill-current" />
                     4.9
                   </Badge>
                 </div>
-                <p className="text-sm text-muted-foreground font-medium mb-3 flex items-center">
-                   <Shield className="w-3 h-3 mr-1 text-primary" />
-                   Premium Verified Partner
+                <p className="text-sm text-yellow-600 font-black mb-3 flex items-center bg-yellow-50 px-2 py-1 rounded-lg w-fit">
+                   <Car className="w-3 h-3 mr-1" />
+                   {driverInfo?.vehicle_number || 'Loading vehicle...'}
                 </p>
 
                 <div className="flex space-x-3">
                   <Button variant="outline" className="flex-1 h-11 rounded-xl bg-muted/30 border-none font-bold text-xs"
                     onClick={() => window.open('tel:9876543210')}>
                     <Phone className="w-4 h-4 mr-2" />
-                    Call
-                  </Button>
-                  <Button variant="outline" className="flex-1 h-11 rounded-xl bg-muted/30 border-none font-bold text-xs">
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    Chat
-                  </Button>
-                </div>
+                     Call
+                   </Button>
+                   <Button 
+                    variant="outline" 
+                    className={`flex-1 h-11 rounded-xl border-none font-bold text-xs transition-all ${showChat ? 'bg-primary text-black' : 'bg-muted/30'}`}
+                    onClick={() => setShowChat(!showChat)}
+                   >
+                     <MessageSquare className="w-4 h-4 mr-2" />
+                     {showChat ? 'Close Chat' : 'Chat'}
+                   </Button>
+                 </div>
               </div>
             </div>
           </Card>
@@ -465,10 +512,18 @@ const RideDetails = () => {
               Finish & Pay Now
               <CreditCard className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-export default RideDetails;
+           )}
+         </div>
+       </div>
+
+       {showChat && ride && (
+         <ChatInterface 
+           rideId={ride.id} 
+           receiverName={driverInfo?.full_name || "Driver"} 
+           onClose={() => setShowChat(false)} 
+         />
+       )}
+     </div>
+   );
+ };
+ export default RideDetails;

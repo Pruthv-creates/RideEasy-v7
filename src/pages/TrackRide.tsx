@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Shield, MapPin, Navigation, ArrowLeft, Zap, Loader2 } from "lucide-react";
+import { Clock, Shield, MapPin, Navigation, ArrowLeft, Zap, Loader2, User } from "lucide-react";
 import MapLibreMap from "@/components/MapLibreMap";
 
 const TrackRide = () => {
@@ -15,6 +15,7 @@ const TrackRide = () => {
   const [liveStats, setLiveStats] = useState({ distance: 0, duration: 0 });
   const [routePath, setRoutePath] = useState<[number, number][]>([]);
   const [fullRoutePath, setFullRoutePath] = useState<[number, number][]>([]);
+  const [driverInfo, setDriverInfo] = useState<{full_name: string, vehicle_number: string} | null>(null);
 
   // Keep rideRef in sync with state
   useEffect(() => {
@@ -54,8 +55,18 @@ const TrackRide = () => {
     if (data) {
         console.log("Initial ride data fetched:", data.status);
         setRide(data);
-        fetchRoute(data);
+        if (data.pickup_lat && data.pickup_lng && data.dropoff_lat && data.dropoff_lng) {
+            fetchRoute(data);
+        }
+        if (data.driver_id) {
+          fetchDriverInfo(data.driver_id);
+        }
     }
+  };
+
+  const fetchDriverInfo = async (driverId: string) => {
+    const { data } = await supabase.from('profiles').select('full_name, vehicle_number').eq('id', driverId).single();
+    if (data) setDriverInfo(data);
   };
 
   const fetchRoute = async (r: any) => {
@@ -192,6 +203,19 @@ const TrackRide = () => {
 
       <div className="p-6 bg-card border-t rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.05)] mt-[-2rem] z-20">
           <div className="space-y-6">
+            {driverInfo && (
+                <div className="flex items-center space-x-4 bg-slate-50 p-4 rounded-3xl border border-slate-100 mb-2">
+                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-primary shadow-sm">
+                        <User className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest leading-none mb-1">Your Driver</p>
+                        <p className="text-sm font-black text-slate-800">{driverInfo.full_name}</p>
+                        <p className="text-[10px] font-bold text-primary uppercase mt-0.5">{driverInfo.vehicle_number}</p>
+                    </div>
+                </div>
+            )}
+
             <div className="space-y-1 px-2">
                 <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em]">Route Details</p>
             </div>

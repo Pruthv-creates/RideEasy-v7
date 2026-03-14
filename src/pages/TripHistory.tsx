@@ -47,6 +47,8 @@ const TripHistory = () => {
         id: ride.id.slice(0, 8).toUpperCase(), // Short ID
         from: ride.pickup_address,
         to: ride.dropoff_address,
+        pickupCoords: { lat: Number(ride.pickup_lat), lng: Number(ride.pickup_lng) },
+        destinationCoords: { lat: Number(ride.dropoff_lat), lng: Number(ride.dropoff_lng) },
         date: new Date(ride.created_at).toLocaleDateString() + ", " + new Date(ride.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         fare: "₹" + ride.fare_amount,
         status: ride.status,
@@ -200,7 +202,19 @@ const TripHistory = () => {
                     View Receipt
                   </Button>
                   {trip.status === "completed" && (
-                    <Button variant="outline" size="sm" className="flex-1 rounded-xl">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1 rounded-xl"
+                      onClick={() => navigate("/book-ride", {
+                        state: {
+                          pickup: trip.from,
+                          destination: trip.to,
+                          pickupCoords: trip.pickupCoords,
+                          destinationCoords: trip.destinationCoords
+                        }
+                      })}
+                    >
                       <Car className="w-4 h-4 mr-2" />
                       Book Again
                     </Button>

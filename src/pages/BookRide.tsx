@@ -143,7 +143,8 @@ const BookRide = () => {
           dropoff_lat: state.destinationCoords?.lat,
           dropoff_lng: state.destinationCoords?.lng,
           fare_amount: selectedCarDetails?.price || 0,
-          status: "requested"
+          status: "requested",
+          otp_code: Math.floor(1000 + Math.random() * 9000).toString()
         })
         .select()
         .single();
