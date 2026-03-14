@@ -182,6 +182,26 @@ const BookRide = () => {
       </div>
 
       <div className="p-4 space-y-6">
+        {!subscription && (
+          <Card 
+            className="p-4 bg-gradient-to-r from-primary to-primary-hover text-primary-foreground border-0 shadow-lg cursor-pointer animate-pulse-subtle"
+            onClick={() => navigate("/subscriptions")}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-white/20 rounded-xl">
+                  <Zap className="w-5 h-5 fill-current" />
+                </div>
+                <div>
+                  <p className="text-sm font-black uppercase tracking-tight">Level Up Your Rides</p>
+                  <p className="text-xs opacity-90">Get up to 25% OFF every ride with Premium.</p>
+                </div>
+              </div>
+              <ArrowLeft className="w-4 h-4 rotate-180" />
+            </div>
+          </Card>
+        )}
+
         {/* Trip Info */}
         <Card className="card-taxi animate-fade-in">
           <div className="space-y-3">

@@ -14,6 +14,7 @@ import NotFound from "./pages/NotFound";
 import DriverDashboard from "./pages/DriverDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import TrackRide from "./pages/TrackRide";
+import Subscriptions from "./pages/Subscriptions";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/driver-dashboard" element={<DriverDashboard />} />
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
             <Route path="/track/:rideId" element={<TrackRide />} />
+            <Route path="/subscriptions" element={<Subscriptions />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

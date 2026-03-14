@@ -70,7 +70,7 @@ const DriverDashboard = () => {
                 const loc = await getReliableLocation();
                 const { lat, lng } = loc;
                 
-                // Upsert location
+                // Upsert location with high frequency
                 const { error } = await supabase
                     .from('driver_locations')
                     .upsert({
@@ -78,6 +78,7 @@ const DriverDashboard = () => {
                         lat: lat,
                         lng: lng,
                         is_online: true,
+                        is_busy: !!activeRide, // Ensure this is synced
                         updated_at: new Date().toISOString()
                     }, { onConflict: 'user_id' });
                 
@@ -96,7 +97,7 @@ const DriverDashboard = () => {
             }
         };
 
-        const intervalId = setInterval(updateLocation, 10000); // Update every 10s
+        const intervalId = setInterval(updateLocation, 3000); // Higher frequency for smooth routes (3s)
         updateLocation(); // Initial call
 
         // Set offline when leaving
@@ -304,15 +305,33 @@ const DriverDashboard = () => {
                                         I Have Arrived
                                     </Button>
                                 )}
-                                {activeRide.status === 'arrived' && (
-                                    <Button className="h-12 bg-orange-600 hover:bg-orange-700 font-bold" onClick={() => handleUpdateRideStatus(activeRide.id, 'in_progress')}>
-                                        Start Trip
-                                    </Button>
-                                )}
                                 {activeRide.status === 'in_progress' && (
-                                    <Button className="h-12 bg-green-600 hover:bg-green-700 font-bold" onClick={() => handleUpdateRideStatus(activeRide.id, 'completed')}>
-                                        Complete Ride
-                                    </Button>
+                                    <div className="grid grid-cols-2 gap-3 w-full">
+                                        <Button 
+                                            variant="destructive" 
+                                            className="h-12 font-bold opacity-80" 
+                                            onClick={() => handleUpdateRideStatus(activeRide.id, 'cancelled')}
+                                        >
+                                            Cancel Trip
+                                        </Button>
+                                        <Button className="h-12 bg-green-600 hover:bg-green-700 font-bold shadow-lg shadow-green-600/20" onClick={() => handleUpdateRideStatus(activeRide.id, 'completed')}>
+                                            Complete Ride
+                                        </Button>
+                                    </div>
+                                )}
+                                {activeRide.status === 'arrived' && (
+                                    <div className="grid grid-cols-2 gap-3 w-full">
+                                        <Button 
+                                            variant="secondary" 
+                                            className="h-12 font-bold" 
+                                            onClick={() => handleUpdateRideStatus(activeRide.id, 'cancelled')}
+                                        >
+                                            No Show
+                                        </Button>
+                                        <Button className="h-12 bg-orange-600 hover:bg-orange-700 font-bold" onClick={() => handleUpdateRideStatus(activeRide.id, 'in_progress')}>
+                                            Start Trip
+                                        </Button>
+                                    </div>
                                 )}
                             </div>
                         </div>

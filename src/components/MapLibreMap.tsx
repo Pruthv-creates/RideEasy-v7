@@ -13,11 +13,13 @@ interface MapProps {
   center?: [number, number]; // [lng, lat]
   zoom?: number;
   drivers?: DriverLocation[];
-  route?: [number, number][]; // [[lng, lat]]
+  route?: [number, number][]; // Active segment [[lng, lat]]
+  fullRoute?: [number, number][]; // Total trip [[lng, lat]]
   pickup?: [number, number];
   destination?: [number, number];
   height?: string;
   onMapClick?: (lng: number, lat: number) => void;
+  onLocateMe?: () => void;
 }
 
 const MapLibreMap: React.FC<MapProps> = ({
@@ -25,10 +27,12 @@ const MapLibreMap: React.FC<MapProps> = ({
   zoom = 14,
   drivers = [],
   route,
+  fullRoute,
   pickup,
   destination,
   height = "400px",
-  onMapClick
+  onMapClick,
+  onLocateMe
 }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
@@ -93,10 +97,15 @@ const MapLibreMap: React.FC<MapProps> = ({
       } else {
         const el = document.createElement('div');
         el.className = 'driver-marker';
-        el.innerHTML = driver.is_busy ? '🚕' : '🚕';
-        el.style.fontSize = '24px';
+        // Premium Nav Arrow Marker (Matches Screenshot)
+        el.innerHTML = `
+            <div class="flex items-center justify-center w-10 h-10 bg-white rounded-full border-4 border-black shadow-2xl ring-4 ring-white/20 transition-all duration-300">
+                <svg viewBox="0 0 24 24" class="w-5 h-5 fill-black transform -rotate-45">
+                    <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
+                </svg>
+            </div>
+        `;
         el.style.transition = 'all 0.5s ease-out';
-        el.style.filter = driver.is_busy ? 'grayscale(100%)' : 'none';
 
         const marker = new maplibregl.Marker({ element: el })
           .setLngLat([driver.lng, driver.lat])
@@ -108,19 +117,7 @@ const MapLibreMap: React.FC<MapProps> = ({
 
   // Update Route
   useEffect(() => {
-    if (!map.current || !route) return;
-
-    const sourceId = 'route-source';
-    const layerId = 'route-layer';
-
-    const geojson: any = {
-      type: 'Feature',
-      properties: {},
-      geometry: {
-        type: 'LineString',
-        coordinates: route
-      }
-    };
+    if (!map.current) return;
 
     const drawRoute = () => {
       if (!map.current) return;
@@ -129,33 +126,51 @@ const MapLibreMap: React.FC<MapProps> = ({
         return;
       }
 
-      const source = map.current.getSource(sourceId);
-      if (source && 'setData' in source) {
-        (source as any).setData(geojson);
-      } else {
-        map.current.addSource(sourceId, {
-          type: 'geojson',
-          data: geojson
-        });
+      // 1. FULL ROUTE (SHADOW)
+      if (fullRoute) {
+        const sourceId = 'full-route-source';
+        const layerId = 'full-route-layer';
+        const geojson: any = { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: fullRoute }};
+        
+        const source = map.current.getSource(sourceId);
+        if (source && 'setData' in source) {
+            (source as any).setData(geojson);
+        } else {
+            map.current.addSource(sourceId, { type: 'geojson', data: geojson });
+            map.current.addLayer({
+                id: layerId,
+                type: 'line',
+                source: sourceId,
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: { 'line-color': '#cbd5e1', 'line-width': 10, 'line-opacity': 0.4 }
+            });
+        }
+      }
 
-        map.current.addLayer({
-          id: layerId,
-          type: 'line',
-          source: sourceId,
-          layout: {
-            'line-join': 'round',
-            'line-cap': 'round'
-          },
-          paint: {
-            'line-color': '#facc15',
-            'line-width': 6
-          }
-        });
+      // 2. ACTIVE ROUTE (BLACK)
+      if (route) {
+        const sourceId = 'active-route-source';
+        const layerId = 'active-route-layer';
+        const geojson: any = { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: route }};
+
+        const source = map.current.getSource(sourceId);
+        if (source && 'setData' in source) {
+            (source as any).setData(geojson);
+        } else {
+            map.current.addSource(sourceId, { type: 'geojson', data: geojson });
+            map.current.addLayer({
+                id: layerId,
+                type: 'line',
+                source: sourceId,
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: { 'line-color': '#000000', 'line-width': 8, 'line-opacity': 1.0 }
+            });
+        }
       }
     };
 
     drawRoute();
-  }, [route]);
+  }, [route, fullRoute]);
 
   // Pickup and Destination Markers
   useEffect(() => {
@@ -167,23 +182,53 @@ const MapLibreMap: React.FC<MapProps> = ({
 
     if (pickup) {
         const el = document.createElement('div');
-        el.innerHTML = '<div class="w-4 h-4 bg-primary rounded-full ring-4 ring-primary/20"></div>';
+        el.className = 'pickup-marker';
+        // Target Marker: Black circle with white square (Matches Screenshot)
+        el.innerHTML = `
+            <div class="flex items-center justify-center w-10 h-10 bg-black rounded-full border-4 border-white shadow-2xl">
+                <div class="w-3 h-3 bg-white rounded-sm"></div>
+            </div>
+        `;
         const m = new maplibregl.Marker({ element: el }).setLngLat(pickup).addTo(map.current);
         markers.current.push(m);
     }
 
     if (destination) {
         const el = document.createElement('div');
-        el.innerHTML = '📍';
-        el.style.fontSize = '24px';
+        el.className = 'destination-marker';
+        // Destination Marker: White circle with black border and black square (Matches Screenshot)
+        el.innerHTML = `
+            <div class="flex items-center justify-center w-10 h-10 bg-white rounded-full border-4 border-black shadow-2xl">
+                <div class="w-3 h-3 bg-black rounded-sm"></div>
+            </div>
+        `;
         const m = new maplibregl.Marker({ element: el }).setLngLat(destination).addTo(map.current);
         markers.current.push(m);
     }
-
   }, [pickup, destination]);
 
+import { Navigation } from 'lucide-react';
+import 'maplibre-gl/dist/maplibre-gl.css';
+
+// ... (rest of the interface stays same)
+
+// (At the bottom of the return)
   return (
-    <div ref={mapContainer} style={{ width: '100%', height, overflow: 'hidden' }} />
+    <div className="relative w-full h-full overflow-hidden">
+        <div ref={mapContainer} style={{ width: '100%', height }} />
+        
+        {onLocateMe && (
+            <button 
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onLocateMe();
+                }}
+                className="absolute bottom-6 right-6 w-12 h-12 bg-white rounded-2xl shadow-2xl flex items-center justify-center border border-border/50 hover:bg-muted transition-all duration-300 z-50 group"
+            >
+                <Navigation className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
+            </button>
+        )}
+    </div>
   );
 };
 

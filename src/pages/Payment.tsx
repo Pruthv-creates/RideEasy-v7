@@ -60,12 +60,11 @@ const Payment = () => {
           const transactionId = response.razorpay_payment_id;
           
           try {
-            // UPDATE DATABASE
+            // UPDATE DATABASE - Only Mark as Paid, DON'T force completion
             const { error } = await supabase
               .from('rides')
               .update({
-                payment_status: 'paid',
-                status: 'completed' // Auto-complete ride on payment for this demo
+                payment_status: 'paid'
               })
               .eq('id', currentRideId);
 

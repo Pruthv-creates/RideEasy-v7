@@ -12,7 +12,9 @@ import {
   Menu,
   User,
   LogOut,
-  Car
+  Car,
+  History,
+  Zap
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -21,6 +23,13 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { getReliableLocation } from "@/utils/geolocation";
 import MapLibreMap from "@/components/MapLibreMap";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger
+} from "@/components/ui/sheet";
 
 const Home = () => {
   const [pickup, setPickup] = useState("");
@@ -64,7 +73,7 @@ const Home = () => {
                if (data.display_name && mounted) {
                    setPickup(data.display_name.split(',').slice(0, 3).join(','));
                }
-            } catch (e) { 
+            } catch (e) {
                 console.error("Geocoding failed, using coordinates:", e);
                 if (mounted) setPickup("Current Location");
             }
@@ -79,9 +88,9 @@ const Home = () => {
 
     const channel = supabase
       .channel('driver-locations')
-      .on('postgres_changes', { 
-         event: '*', 
-         schema: 'public', 
+      .on('postgres_changes', {
+         event: '*',
+         schema: 'public',
          table: 'driver_locations',
          filter: 'is_online=eq.true'
       }, () => {
@@ -100,7 +109,7 @@ const Home = () => {
       .select('*')
       .eq('is_online', true)
       .eq('is_busy', false);
-    
+
     if (data) {
       setNearbyDrivers(data.map(d => ({
         id: d.user_id,
@@ -195,9 +204,63 @@ const Home = () => {
       <div className="bg-card border-b border-border/50 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <Button variant="ghost" size="icon" className="rounded-xl">
-              <Menu className="w-5 h-5" />
-            </Button>
+            <Sheet>
+                <SheetTrigger asChild>
+                    <Button variant="ghost" size="icon" className="rounded-xl">
+                        <Menu className="w-5 h-5" />
+                    </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-[300px] p-0">
+                    <SheetHeader className="p-6 bg-primary text-primary-foreground">
+                        <div className="flex items-center space-x-3 text-left">
+                            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center">
+                                <User className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <SheetTitle className="text-primary-foreground font-black text-lg truncate w-[180px]">{user?.email}</SheetTitle>
+                                <p className="text-xs font-bold uppercase tracking-widest opacity-80">{role}</p>
+                            </div>
+                        </div>
+                    </SheetHeader>
+                    <div className="p-4 space-y-2 mt-4">
+                        <Button
+                            variant="ghost"
+                            className="w-full justify-start h-14 rounded-2xl text-lg font-bold"
+                            onClick={() => navigate("/home")}
+                        >
+                            <HomeIcon className="w-5 h-5 mr-4 text-primary" />
+                            Home
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            className="w-full justify-start h-14 rounded-2xl text-lg font-bold"
+                            onClick={() => navigate("/trip-history")}
+                        >
+                            <History className="w-5 h-5 mr-4 text-primary" />
+                            Your Trips
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            className="w-full justify-start h-14 rounded-2xl text-lg font-bold bg-primary/5 border-2 border-primary/20"
+                            onClick={() => navigate("/subscriptions")}
+                        >
+                            <Zap className="w-5 h-5 mr-4 text-primary fill-primary" />
+                            Subscription Tiers
+                        </Button>
+                        <div className="pt-6 mt-6 border-t font-black px-4 uppercase text-[10px] tracking-widest text-muted-foreground">
+                            Settings & Support
+                        </div>
+                        <Button
+                            variant="ghost"
+                            className="w-full justify-start h-14 rounded-2xl text-lg font-bold text-destructive hover:text-destructive hover:bg-destructive/5"
+                            onClick={handleLogout}
+                        >
+                            <LogOut className="w-5 h-5 mr-4" />
+                            Logout
+                        </Button>
+                    </div>
+                </SheetContent>
+            </Sheet>
             <div>
               <p className="text-sm text-muted-foreground leading-none mb-1">Welcome</p>
               <p className="font-bold text-sm truncate max-w-[150px]">{user?.email}</p>
@@ -207,9 +270,6 @@ const Home = () => {
             <Badge variant="secondary" className="bg-primary/10 text-primary border-0 font-bold text-[10px]">
               {role?.toUpperCase()}
             </Badge>
-            <Button variant="ghost" size="icon" className="rounded-xl text-muted-foreground" onClick={handleLogout}>
-              <LogOut className="w-5 h-5" />
-            </Button>
           </div>
         </div>
       </div>

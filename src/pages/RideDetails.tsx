@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { RatingDialog } from "@/components/RatingDialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +44,7 @@ const RideDetails = () => {
   const [ride, setRide] = useState<Ride | null>(null);
   const [loading, setLoading] = useState(true);
   const [routePath, setRoutePath] = useState<[number, number][]>([]);
+  const [fullRoutePath, setFullRoutePath] = useState<[number, number][]>([]);
   const [driverLoc, setDriverLoc] = useState<{lat: number, lng: number} | null>(null);
   const [liveStats, setLiveStats] = useState({ distance: 0, duration: 0 });
   const [hasRated, setHasRated] = useState(false);
@@ -90,58 +92,80 @@ const RideDetails = () => {
 
   // Fetch Route when ride data is available
   useEffect(() => {
-    if (ride && ride.pickup_lat && ride.dropoff_lat) {
+    if (ride?.pickup_lat && ride?.dropoff_lat) {
+      console.log("Fetching root for ride:", ride.id);
       fetchRoute(ride.pickup_lat, ride.pickup_lng, ride.dropoff_lat, ride.dropoff_lng);
     }
-    
-    // If assigned, watch driver
+  }, [ride?.id]); // Only refetch full route if ride ID changes
+
+  // Watch driver location
+  useEffect(() => {
     if (ride?.driver_id) {
-       subscribeToDriver(ride.driver_id);
+       console.log("Starting driver subscription for:", ride.driver_id);
+       const cleanup = subscribeToDriver(ride.driver_id);
+       return () => {
+         cleanup();
+       };
     }
-  }, [ride]);
+  }, [ride?.driver_id]);
 
   const subscribeToDriver = (driverId: string) => {
      // Fetch initial
      supabase.from('driver_locations').select('*').eq('user_id', driverId).single().then(({data}) => {
-        if (data) setDriverLoc({lat: Number(data.lat), lng: Number(data.lng)});
+        if (data) {
+            console.log("Initial driver loc:", data.lat, data.lng);
+            setDriverLoc({lat: Number(data.lat), lng: Number(data.lng)});
+        }
      });
 
      // Listen
-     return supabase.channel(`driver:${driverId}`)
+     const channel = supabase.channel(`driver-track-${driverId}`)
         .on('postgres_changes', { 
             event: 'UPDATE', 
             schema: 'public', 
             table: 'driver_locations', 
             filter: `user_id=eq.${driverId}` 
         }, (payload) => {
+            console.log("Driver moved:", payload.new.lat, payload.new.lng);
             setDriverLoc({lat: Number(payload.new.lat), lng: Number(payload.new.lng)});
         })
         .subscribe();
+        
+     return () => {
+        console.log("Cleaning up driver subscription");
+        supabase.removeChannel(channel);
+     };
   };
 
   // Update live ETA when driver moves
   useEffect(() => {
-    if (driverLoc && ride?.dropoff_lat) {
+    if (driverLoc && ride) {
         updateLiveETA();
     }
-  }, [driverLoc]);
+  }, [driverLoc, ride?.status]);
 
   const updateLiveETA = async () => {
       if (!driverLoc || !ride) return;
       try {
-        const destLat = (ride.status === 'accepted' || ride.status === 'arrived') ? ride.pickup_lat : ride.dropoff_lat;
-        const destLng = (ride.status === 'accepted' || ride.status === 'arrived') ? ride.pickup_lng : ride.dropoff_lng;
+        const isHeComingToMe = (ride.status === 'accepted' || ride.status === 'arrived');
+        const destLat = isHeComingToMe ? ride.pickup_lat : ride.dropoff_lat;
+        const destLng = isHeComingToMe ? ride.pickup_lng : ride.dropoff_lng;
 
-        const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${driverLoc.lng},${driverLoc.lat};${destLng},${destLat}?overview=false`);
+        console.log(`OSRM ETA request: from driver(${driverLoc.lat}, ${driverLoc.lng}) to ${isHeComingToMe ? 'pickup' : 'dropoff'}`);
+        
+        const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${driverLoc.lng},${driverLoc.lat};${destLng},${destLat}?overview=full&geometries=geojson`);
         const data = await res.json();
         if (data.routes && data.routes[0]) {
+            const route = data.routes[0];
             setLiveStats({
-                distance: data.routes[0].distance / 1000,
-                duration: data.routes[0].duration / 60
+                distance: route.distance / 1000,
+                duration: route.duration / 60
             });
+            // Update route path to be from driver to destination
+            setRoutePath(route.geometry.coordinates);
         }
       } catch (e) {
-          console.error(e);
+          console.error("OSRM Live Update Error:", e);
       }
   };
 
@@ -153,8 +177,9 @@ const RideDetails = () => {
 
       if (data.routes && data.routes.length > 0) {
         const coordinates = data.routes[0].geometry.coordinates;
-        const leafletCoords = coordinates.map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
-        setRoutePath(leafletCoords);
+        setRoutePath(coordinates); // Use native geojson coordinates [lng, lat]
+        setFullRoutePath(coordinates); // Save full trip line
+        
         if (liveStats.distance === 0) {
             setLiveStats({
                 distance: data.routes[0].distance / 1000,
@@ -226,6 +251,7 @@ const RideDetails = () => {
                 height="100%"
                 drivers={driverLoc ? [{ id: ride.driver_id, lat: driverLoc.lat, lng: driverLoc.lng }] : []}
                 route={routePath}
+                fullRoute={fullRoutePath}
                 pickup={[ride.pickup_lng, ride.pickup_lat]}
                 destination={[ride.dropoff_lng, ride.dropoff_lat]}
                 center={driverLoc ? [driverLoc.lng, driverLoc.lat] : [ride.pickup_lng, ride.pickup_lat]}
@@ -445,5 +471,4 @@ const RideDetails = () => {
     </div>
   );
 };
-import { RatingDialog } from "@/components/RatingDialog";
 export default RideDetails;
