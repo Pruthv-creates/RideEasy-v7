@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from 
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Crosshair } from 'lucide-react';
-import taxiPng from '@/assets/taxi.png';
+import taxiPng from '@/assets/taxi map image.png';
 
 const pickupIcon = new L.DivIcon({
   className: 'custom-leaflet-icon',
