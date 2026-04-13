@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
-type UserRole = "customer" | "driver" | "admin" | null;
+type UserRole = "rider" | "driver" | "admin" | null;
 
 interface AuthContextType {
     user: User | null;
@@ -69,7 +69,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                     .from("profiles")
                     .upsert({ 
                         id: userId, 
-                        role: intendedRole || existingProfile?.role || 'customer',
+                        role: intendedRole || existingProfile?.role || 'rider',
                         email: user.email,
                         full_name: user.user_metadata?.full_name || user.user_metadata?.name,
                     }, { onConflict: 'id' });

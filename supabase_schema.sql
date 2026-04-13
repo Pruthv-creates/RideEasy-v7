@@ -3,7 +3,7 @@ create table if not exists profiles (
   id uuid references auth.users not null primary key,
   email text,
   full_name text,
-  role text check (role in ('customer', 'driver', 'admin')) default 'customer',
+  role text check (role in ('rider', 'driver', 'admin')) default 'rider',
   phone_number text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -30,7 +30,7 @@ create policy "Users can update own profile."
 -- Create a table for rides
 create table if not exists rides (
   id uuid default gen_random_uuid() primary key,
-  customer_id uuid references profiles(id) on delete cascade not null,
+  rider_id uuid references profiles(id) on delete cascade not null,
   driver_id uuid references profiles(id) on delete set null,
   pickup_address text not null,
   dropoff_address text not null,
@@ -48,11 +48,11 @@ create table if not exists rides (
 alter table rides enable row level security;
 
 -- Policies for rides
--- 1. Customers can see their own rides
-drop policy if exists "Customers can view their own rides" on rides;
-create policy "Customers can view their own rides"
+-- 1. Riders can see their own rides
+drop policy if exists "Riders can view their own rides" on rides;
+create policy "Riders can view their own rides"
   on rides for select
-  using ( auth.uid() = customer_id );
+  using ( auth.uid() = rider_id );
 
 -- 2. Drivers can see available requested rides AND rides they accepted
 drop policy if exists "Drivers can view requested or assigned rides" on rides;
@@ -64,11 +64,11 @@ create policy "Drivers can view requested or assigned rides"
     (auth.uid() in (select id from profiles where role = 'admin'))
   );
 
--- 3. Customers can insert (request) rides
-drop policy if exists "Customers can request rides" on rides;
-create policy "Customers can request rides"
+-- 3. Riders can insert (request) rides
+drop policy if exists "Riders can request rides" on rides;
+create policy "Riders can request rides"
   on rides for insert
-  with check ( auth.uid() = customer_id );
+  with check ( auth.uid() = rider_id );
 
 -- 4. Drivers can update rides (accept, complete)
 drop policy if exists "Drivers can update assigned rides" on rides;

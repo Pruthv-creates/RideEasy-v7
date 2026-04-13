@@ -27,20 +27,12 @@ begin
   end if;
 end $$;
 
--- 3. Fix RLS so the realtime change is visible to BOTH customer and driver
---    The existing policy only allowed customers to see their OWN rides,
---    but the driver (who just accepted) also needs Realtime access to that row.
---    Drop old overlapping policies and add a clean combined one:
-
--- Drop old customer select policy (replace with combined one below)
-drop policy if exists "Customers can view their own rides" on rides;
-
--- Unified read policy: customers see their rides, drivers see assigned/requested, admins see all
+-- Unified read policy: riders see their rides, drivers see assigned/requested, admins see all
 drop policy if exists "Rides are readable by participants and drivers" on rides;
 create policy "Rides are readable by participants and drivers"
   on rides for select
   using (
-    auth.uid() = customer_id
+    auth.uid() = rider_id
     OR auth.uid() = driver_id
     OR status = 'requested'
     OR exists (select 1 from profiles where id = auth.uid() and role = 'admin')

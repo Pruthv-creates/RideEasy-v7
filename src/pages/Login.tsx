@@ -19,7 +19,7 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
-  const [role, setRole] = useState<"customer" | "driver">("customer");
+  const [role, setRole] = useState<"rider" | "driver">("rider");
   const [useOtp, setUseOtp] = useState(false);
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [otpCode, setOtpCode] = useState("");
@@ -293,10 +293,10 @@ const Login = () => {
               {!isLogin && (
                 <div className="space-y-3 pt-2">
                   <Label>I want to join as a:</Label>
-                  <RadioGroup defaultValue="customer" onValueChange={(v) => setRole(v as "customer" | "driver")} className="flex space-x-4">
+                  <RadioGroup defaultValue="rider" onValueChange={(v) => setRole(v as "rider" | "driver")} className="flex space-x-4">
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="customer" id="r-customer" />
-                      <Label htmlFor="r-customer">Customer</Label>
+                      <RadioGroupItem value="rider" id="r-rider" />
+                      <Label htmlFor="r-rider">Rider</Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="driver" id="r-driver" />

@@ -135,7 +135,7 @@ const BookRide = () => {
       const { data, error } = await supabase
         .from("rides")
         .insert({
-          customer_id: user.id,
+          rider_id: user.id,
           pickup_address: pickupAddress,
           dropoff_address: dropoffAddress,
           pickup_lat: state.pickupCoords?.lat,

@@ -28,7 +28,7 @@ const AdminDashboard = () => {
     }, [user, role, loading, navigate]);
 
     const fetchStats = async () => {
-        const { count: userCount } = await supabase.from("profiles").select("*", { count: 'exact', head: true }).eq('role', 'customer');
+        const { count: userCount } = await supabase.from("profiles").select("*", { count: 'exact', head: true }).eq('role', 'rider');
         const { count: driverCount } = await supabase.from("profiles").select("*", { count: 'exact', head: true }).eq('role', 'driver');
         const { count: rideCount } = await supabase.from("rides").select("*", { count: 'exact', head: true });
 
@@ -61,7 +61,7 @@ const AdminDashboard = () => {
                     <Card className="p-4 flex flex-col items-center justify-center space-y-2">
                         <Users className="w-8 h-8 text-blue-500" />
                         <span className="text-2xl font-bold">{totalUsers}</span>
-                        <span className="text-xs text-muted-foreground">Customers</span>
+                        <span className="text-xs text-muted-foreground">Riders</span>
                     </Card>
                     <Card className="p-4 flex flex-col items-center justify-center space-y-2">
                         <Car className="w-8 h-8 text-green-500" />

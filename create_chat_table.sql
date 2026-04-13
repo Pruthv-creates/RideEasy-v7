@@ -18,7 +18,7 @@ create policy "Ride participants can view messages"
     exists (
       select 1 from rides
       where rides.id = ride_messages.ride_id
-      and (rides.customer_id = auth.uid() or rides.driver_id = auth.uid())
+      and (rides.rider_id = auth.uid() or rides.driver_id = auth.uid())
     )
   );
 
@@ -29,7 +29,7 @@ create policy "Ride participants can send messages"
     exists (
       select 1 from rides
       where rides.id = ride_messages.ride_id
-      and (rides.customer_id = auth.uid() or rides.driver_id = auth.uid())
+      and (rides.rider_id = auth.uid() or rides.driver_id = auth.uid())
     )
     and auth.uid() = sender_id
   );

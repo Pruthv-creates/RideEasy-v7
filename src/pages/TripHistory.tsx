@@ -38,7 +38,7 @@ const TripHistory = () => {
           *,
           driver:profiles!rides_driver_id_fkey(full_name)
         `)
-        .eq('customer_id', user.id)
+        .eq('rider_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

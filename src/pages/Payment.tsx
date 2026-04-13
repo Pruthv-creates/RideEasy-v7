@@ -24,7 +24,7 @@ const Payment = () => {
       const { data, error } = await supabase
         .from('rides')
         .select('*')
-        .eq('customer_id', user.id)
+        .eq('rider_id', user.id)
         .eq('payment_status', 'pending')
         .neq('status', 'cancelled')
         .order('created_at', { ascending: false })
@@ -55,7 +55,7 @@ const Payment = () => {
         name: "RideEasy Payments",
         description: `Payment for Ride #${currentRideId.slice(0, 8)}`,
         userEmail: user?.email,
-        userName: user?.user_metadata?.full_name || "Valued Customer",
+        userName: user?.user_metadata?.full_name || "Valued Rider",
         onSuccess: async (response) => {
           const transactionId = response.razorpay_payment_id;
           

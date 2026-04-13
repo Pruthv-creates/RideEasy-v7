@@ -74,7 +74,7 @@ interface Ride {
     dropoff_lng: number;
     status: string;
     fare_amount: number;
-    customer_id: string;
+    rider_id: string;
     driver_id?: string;
     created_at: string;
     payment_status?: string;
@@ -521,8 +521,8 @@ const DriverDashboard = () => {
         }
 
         const currentActive = rides.find(r => ['accepted', 'arrived', 'in_progress'].includes(r.status));
-        if (currentActive && currentActive.customer_id) {
-            const { data: cust } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', currentActive.customer_id).single();
+        if (currentActive && currentActive.rider_id) {
+            const { data: cust } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', currentActive.rider_id).single();
             if (cust) setCustomerInfo(cust);
         } else {
             setCustomerInfo(null);
