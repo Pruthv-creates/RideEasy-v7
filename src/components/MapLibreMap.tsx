@@ -70,10 +70,10 @@ const MapLibreMap: React.FC<MapProps> = ({
       map.current?.resize();
     });
 
-    map.current.on('styledata', () => {
-      console.log('🎨 [Map] Style data updated — re-drawing routes');
-      drawRoute();
-    });
+    // NOTE: styledata listener intentionally REMOVED.
+    // It fired on every pan/zoom with a stale closure (empty route data),
+    // overwriting the drawn route line with empty coordinates.
+    // The useEffect([route, fullRoute]) below handles all re-draws correctly.
 
     map.current.on('error', (e) => {
       console.error('🔴 [Map] MapLibre internal error:', e.error?.message ?? e);

@@ -163,13 +163,19 @@ const Home = () => {
     
     setIsCalculatingRoute(true);
     try {
+        console.log("Fetching route from OSRM...", { pickupCoords, destinationCoords });
         const res = await fetch(
             `https://router.project-osrm.org/route/v1/driving/${pickupCoords.lng},${pickupCoords.lat};${destinationCoords.lng},${destinationCoords.lat}?overview=full&geometries=geojson`
         );
         const data = await res.json();
         
+        console.log("OSRM Response:", data);
+        
         if (data.routes && data.routes[0]) {
+            console.log("Setting route path:", data.routes[0].geometry.coordinates.length, "points");
             setRoutePath(data.routes[0].geometry.coordinates);
+        } else {
+            console.warn("No routes found in OSRM response");
         }
     } catch (err) {
         console.error("Routing error:", err);
