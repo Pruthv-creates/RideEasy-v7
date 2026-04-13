@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
@@ -144,6 +144,8 @@ const DriverDashboard = () => {
     const [withdrawAmount, setWithdrawAmount] = useState('');
     const [payoutMethod, setPayoutMethod] = useState<'upi' | 'bank'>('upi');
     const [isProcessingWithdraw, setIsProcessingWithdraw] = useState(false);
+    const [isSimulating, setIsSimulating] = useState(false);
+    const simulationRef = useRef<NodeJS.Timeout | null>(null);
     
     // Mock Driver Performance
     const onlineTime = "5h 24m";
@@ -632,6 +634,74 @@ const DriverDashboard = () => {
         }
     };
 
+    const handleSimulateDrive = async () => {
+        if (!activeRide || !user) return;
+
+        // Stop any ongoing simulation
+        if (isSimulating) {
+            if (simulationRef.current) clearInterval(simulationRef.current);
+            setIsSimulating(false);
+            toast.info('Simulation stopped');
+            return;
+        }
+
+        // Figure out destination based on ride status
+        const goingToPickup = activeRide.status === 'accepted' || activeRide.status === 'arrived';
+        const destLat = goingToPickup ? activeRide.pickup_lat : activeRide.dropoff_lat;
+        const destLng = goingToPickup ? activeRide.pickup_lng : activeRide.dropoff_lng;
+
+        // Get driver's current location as simulation start
+        const { data: locData } = await supabase
+            .from('driver_locations')
+            .select('lat, lng')
+            .eq('user_id', user.id)
+            .single();
+
+        const startLat = locData?.lat ?? 19.076;
+        const startLng = locData?.lng ?? 72.877;
+
+        toast.info(`🚗 Fetching simulation route...`);
+        try {
+            const res = await fetch(
+                `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson`
+            );
+            const data = await res.json();
+            if (!data.routes?.[0]) {
+                toast.error('Could not get route from OSRM');
+                return;
+            }
+
+            const coords: [number, number][] = data.routes[0].geometry.coordinates; // [lng, lat][]
+            let idx = 0;
+            const STEP = 8; // skip 8 coords per tick for realistic speed
+
+            setIsSimulating(true);
+            toast.success(`▶ Simulation started — ${coords.length} route points`);
+
+            simulationRef.current = setInterval(async () => {
+                if (idx >= coords.length) {
+                    clearInterval(simulationRef.current!);
+                    setIsSimulating(false);
+                    toast.success('✅ Simulation complete — driver reached destination');
+                    return;
+                }
+                const [lng, lat] = coords[idx];
+                await supabase.from('driver_locations').upsert({
+                    user_id: user.id,
+                    lat, lng,
+                    is_online: true,
+                    is_busy: true,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id' });
+                idx += STEP;
+            }, 1500);
+
+        } catch (e) {
+            toast.error('Simulation failed — check network');
+            console.error('🔴 [Simulation] OSRM request failed:', e);
+        }
+    };
+
     const handleLogout = async () => {
         if (user) await supabase.from('driver_locations').update({ is_online: false }).eq('user_id', user.id);
         await signOut();
@@ -727,24 +797,36 @@ const DriverDashboard = () => {
                             <div className="space-y-3 pt-2">
                                 <Button 
                                     variant="outline"
-                                    className="w-full h-14 font-black rounded-2xl border-2 hover:bg-slate-50" 
-                                    onClick={() => {
-                                        const dest = activeRide.status === 'accepted' ? activeRide.pickup_address : activeRide.dropoff_address;
-                                        window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}`, '_blank')
-                                    }}
+                                    className="w-full h-14 font-black rounded-2xl border-2 hover:bg-slate-50 relative overflow-hidden group" 
+                                    onClick={handleSimulateDrive}
                                 >
-                                    <Navigation className="w-5 h-5 mr-2" />
-                                    OPEN NAVIGATION
+                                    <Zap className={`w-5 h-5 mr-2 ${isSimulating ? 'text-orange-500 animate-pulse' : 'text-slate-400'}`} />
+                                    {isSimulating ? 'STOP SIMULATION' : 'SIMULATE DRIVE (TEST)'}
+                                    {isSimulating && <div className="absolute bottom-0 left-0 h-1 bg-orange-500 animate-pulse w-full"></div>}
                                 </Button>
 
-                                <Button 
-                                    variant="outline"
-                                    className={`w-full h-14 font-black rounded-2xl border-2 transition-all ${showChat ? 'bg-primary border-primary text-black' : 'hover:bg-slate-50'}`} 
-                                    onClick={() => setShowChat(!showChat)}
-                                >
-                                    <MessageCircle className="w-5 h-5 mr-2" />
-                                    {showChat ? 'CLOSE CHAT' : 'CHAT WITH RIDER'}
-                                </Button>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <Button 
+                                        variant="outline"
+                                        className="h-14 font-black rounded-2xl border-2 hover:bg-slate-50" 
+                                        onClick={() => {
+                                            const dest = activeRide.status === 'accepted' ? activeRide.pickup_address : activeRide.dropoff_address;
+                                            window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}`, '_blank')
+                                        }}
+                                    >
+                                        <Navigation className="w-5 h-5 mr-2" />
+                                        NAVIGATE
+                                    </Button>
+
+                                    <Button 
+                                        variant="outline"
+                                        className={`h-14 font-black rounded-2xl border-2 transition-all ${showChat ? 'bg-primary border-primary text-black' : 'hover:bg-slate-50'}`} 
+                                        onClick={() => setShowChat(!showChat)}
+                                    >
+                                        <MessageCircle className="w-5 h-5 mr-2" />
+                                        CHAT
+                                    </Button>
+                                </div>
                                 
                                 <div className="grid grid-cols-1 gap-3">
                                     {activeRide.status === 'accepted' ? (
