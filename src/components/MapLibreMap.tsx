@@ -167,7 +167,12 @@ const MapLibreMap: React.FC<MapProps> = ({
       console.log(`🗺️ [Map] Drawing full route: ${fullRoute.length} points`);
       const sourceId = 'full-route-source';
       const layerId  = 'full-route-layer';
-      const geojson: any = { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: fullRoute }};
+      const geojson: any = { 
+        type: 'FeatureCollection', 
+        features: [{
+          type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: fullRoute }
+        }]
+      };
       
       if (map.current.getSource(sourceId)) {
         try {
@@ -198,7 +203,12 @@ const MapLibreMap: React.FC<MapProps> = ({
       const sourceId = 'active-route-source';
       const layerId  = 'active-route-layer';
       const casingId = 'active-route-casing';
-      const geojson: any = { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: route }};
+      const geojson: any = { 
+        type: 'FeatureCollection', 
+        features: [{
+          type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: route }
+        }]
+      };
 
       if (map.current.getSource(sourceId)) {
         try {
